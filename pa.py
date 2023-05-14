@@ -44,13 +44,12 @@ def getSinglePic(url, picPath):
         repeat_user_name += 1
     # 提取图片原图地址
     picture = re.search('"original":"(.+?)"},"tags"', response.text)
-    if picture == None or picture.group(1) == None:
-        return True
+    if picture == None:
+        return False
     pic = requests.get(picture.group(1), headers=headers, proxies=proxies)
+    print(picture.group(1))
     f = open(
-        picPath
-        + "%s_%s-by-%s.%s" % (illust_id, name, user_name, picture.group(1)[-3:]),
-        "wb",
+        picPath + "%s-by-%s.%s" % (illust_id, user_name, picture.group(1)[-3:]), "wb"
     )
     f.write(pic.content)
     f.close()
@@ -59,8 +58,7 @@ def getSinglePic(url, picPath):
 
 def generateJson(picPath: str):
     # generate one picPath json file
-    generate_one_json(picPath)
-
+    # generate_one_json(picPath)
     # generate other json file
     path = PixivPath
     dirs_all = os.listdir(path)
@@ -92,11 +90,48 @@ def generateJson(picPath: str):
 
 def generate_one_json(picPath):
     file_path = get_file_list(picPath, [".jpg", ".png"])
-    pixiv_json = {"pixiv_pic": file_path}
+    struct = rename_with_short_name(file_path)
+    # check struct length
+    if len(struct) == 0:
+        return
+    pixiv_json = {"pixiv_pic": struct}
     pixiv_json_path = picPath + "pixiv_pic.json"
     pixiv_json_file = open(pixiv_json_path, "wb")
     pixiv_json_file.write(json.dumps(pixiv_json).encode())
     pixiv_json_file.close()
+
+
+def rename_with_short_name(files: List[str]):
+    # a struct has name ,path and index
+    struct = []
+    for i in range(len(files)):
+        file = files[i]
+        file_name = os.path.basename(file)
+        # check file name has "-by-"
+        if file_name.find("-by-") == -1:
+            continue
+        # 获取文件后缀
+        file_ext = os.path.splitext(file_name)[1]
+        id = file_name.split("_")[0]
+        user_name = file_name.split("-by-")[1].split(".")[0]
+        new_name = id + file_ext
+        # renme and check file is exists
+        if os.path.exists(os.path.dirname(file) + "/" + new_name):
+            print("file exists")
+            new_name = id + "-" + str(i) + file_ext
+            os.rename(file, os.path.dirname(file) + "/" + new_name)
+        else:
+            os.rename(file, os.path.dirname(file) + "/" + new_name)
+        struct.append(
+            {
+                "name": id,
+                "path": files[i],
+                "index": i,
+                "user": user_name,
+                "ext": file_ext,
+            }
+        )
+    return struct
 
 
 def get_file_list(path: str, file_ext: List[str]) -> List[str]:
@@ -110,8 +145,8 @@ def get_file_list(path: str, file_ext: List[str]) -> List[str]:
 
 
 def get_proxy():
-    proxies = {"http": "http://127.0.0.1:11000", "https": "http://127.0.0.1:11000"}
-    proxies = None
+    proxies = {"http": "http://127.0.0.1:10900", "https": "http://127.0.0.1:10900"}
+    # proxies = None
     return proxies
 
 
@@ -139,23 +174,16 @@ def getAllPicUrl():
     return None
 
 
-getAllPicUrl()
+def renameAndGenerateJson():
+    # generate other json file
+    path = PixivPath
+    dirs_all = os.listdir(path)
+    for dir in dirs_all:
+        pd = path + dir
+        if os.path.isdir(pd):
+            # json_file = get_file_list(pd+"/", ['.json'])
+            generate_one_json(pd + "/")
 
-""" dirs_all = os.listdir(path)
-for dir in dirs_all:
-    pd = path+dir
-    if os.path.isdir(pd):
-        print(pd)
-        json_file = get_file_list(pd+"/", ['.json'])
-        print(json_file)
-        generate_one_json(pd+"/") """
 
-""" pixivPath = PixivPath
-pixivJsonPath = PixivPath+'url.json'
-path = [os.path.join(dp, f) for dp, dn, fs in os.walk(pixivPath) for f in fs if
-        os.path.splitext(f)[1] in ['.json']]
-path = [i for i in path if i.find(pixivJsonPath) == -1]
-pixiv_json = {"pixiv": path}
-jj = json.dumps(pixiv_json)
-print(jj)
-print(pixivJsonPath != "./pixiv/url.json") """
+# getAllPicUrl()
+renameAndGenerateJson()
